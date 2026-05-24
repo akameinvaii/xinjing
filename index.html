@@ -1,0 +1,1918 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>心镜随记 · 显化情绪辅导助手</title>
+<script type="module">
+// WebLLM: 浏览器本地 AI（无需登录、无需 API Key）
+(async () => {
+  try {
+    const mod = await import("https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.68/+esm");
+    window.webllm = mod;
+    console.log("[WebLLM] SDK 已加载", Object.keys(mod));
+  } catch (e) {
+    console.warn("[WebLLM] jsdelivr 加载失败，尝试备用 CDN:", e.message);
+    try {
+      const mod = await import("https://esm.sh/@mlc-ai/web-llm@0.2.68");
+      window.webllm = mod;
+      console.log("[WebLLM] SDK 已加载 (esm.sh)");
+    } catch (e2) {
+      console.error("[WebLLM] SDK 加载完全失败:", e2.message);
+    }
+  }
+})();
+</script>
+<style>
+/* ===== CSS Variables & Reset ===== */
+:root {
+  --bg: #f7f3ef;
+  --card-bg: #fdfaf7;
+  --text: #4a4458;
+  --text-light: #7c7488;
+  --text-muted: #a098ae;
+  --border: #e6dfd7;
+  --pink: #d4a5a5;
+  --pink-light: #f0dede;
+  --purple: #b8a9c9;
+  --purple-light: #e8e0f0;
+  --green: #a8c5a0;
+  --green-light: #e2efe0;
+  --cream: #faf5ef;
+  --accent: #c4a882;
+  --shadow: 0 2px 12px rgba(120, 100, 100, 0.08);
+  --shadow-hover: 0 4px 20px rgba(120, 100, 100, 0.14);
+  --radius: 16px;
+  --radius-sm: 10px;
+  --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.7;
+  font-size: 16px;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  padding: 20px 16px 40px;
+  background-image:
+    radial-gradient(ellipse at 20% 20%, rgba(212,165,165,0.12) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 60%, rgba(184,169,201,0.10) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 90%, rgba(168,197,160,0.08) 0%, transparent 50%);
+}
+
+.container { width: 100%; max-width: 640px; display: flex; flex-direction: column; gap: 20px; }
+
+/* ===== Header ===== */
+.header {
+  text-align: center;
+  padding: 24px 20px 12px;
+}
+.header .date {
+  font-size: 14px;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+.header .quote {
+  font-size: 15px;
+  color: var(--text-light);
+  font-style: italic;
+  opacity: 0;
+  transform: translateY(8px);
+  animation: fadeSlideIn 0.8s 0.2s forwards;
+}
+
+@keyframes fadeSlideIn {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== Card Base ===== */
+.card {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  padding: 24px 22px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  transition: box-shadow var(--transition);
+}
+
+/* ===== Journal Area ===== */
+.journal-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.journal-label .icon { font-size: 18px; }
+
+.journal-textarea {
+  width: 100%;
+  min-height: 140px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  font-size: 15px;
+  line-height: 1.8;
+  color: var(--text);
+  background: var(--cream);
+  resize: vertical;
+  font-family: inherit;
+  transition: border-color var(--transition), box-shadow var(--transition);
+  outline: none;
+}
+.journal-textarea:focus {
+  border-color: var(--purple);
+  box-shadow: 0 0 0 3px rgba(184,169,201,0.2);
+}
+.journal-textarea::placeholder { color: #c8c0d4; }
+
+.char-count {
+  text-align: right;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+.char-count.warn { color: var(--pink); }
+.char-count.limit { color: #c97070; font-weight: 600; }
+
+/* ===== Emotion Buttons ===== */
+.emotion-section {
+  margin-top: 4px;
+}
+.emotion-label {
+  font-size: 13px;
+  color: var(--text-light);
+  margin-bottom: 10px;
+}
+.emotion-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.emotion-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 14px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border);
+  background: var(--card-bg);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all var(--transition);
+  color: var(--text-light);
+  white-space: nowrap;
+  user-select: none;
+}
+.emotion-btn:hover {
+  border-color: var(--purple);
+  background: var(--purple-light);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
+}
+.emotion-btn.active {
+  border-color: var(--purple);
+  background: var(--purple-light);
+  color: #5e4e7a;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(184,169,201,0.3);
+}
+.emotion-btn .emoji {
+  font-size: 18px;
+  animation: none;
+}
+.emotion-btn.active .emoji {
+  animation: floatEmoji 1.8s ease-in-out infinite;
+}
+
+@keyframes floatEmoji {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+/* ===== Action Buttons ===== */
+.actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+.btn {
+  flex: 1;
+  min-width: 120px;
+  padding: 12px 20px;
+  border-radius: 25px;
+  border: none;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition);
+  font-family: inherit;
+  letter-spacing: 0.3px;
+}
+.btn-analyze {
+  background: linear-gradient(135deg, #c4a882, #b8a08a);
+  color: #fff;
+  box-shadow: 0 3px 12px rgba(180,150,130,0.3);
+}
+.btn-analyze:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(180,150,130,0.4);
+}
+.btn-analyze:active { transform: translateY(0); }
+
+.btn-save {
+  background: var(--card-bg);
+  color: var(--text);
+  border: 1.5px solid var(--border);
+}
+.btn-save:hover {
+  border-color: var(--purple);
+  background: var(--purple-light);
+  transform: translateY(-2px);
+}
+.btn-history {
+  width: 100%;
+  padding: 10px 20px;
+  border-radius: 25px;
+  border: 1.5px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text-light);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all var(--transition);
+  font-family: inherit;
+}
+.btn-history:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
+}
+
+/* ===== Save Toast ===== */
+.save-toast {
+  text-align: center;
+  font-size: 14px;
+  color: var(--accent);
+  padding: 10px;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: all 0.5s;
+  pointer-events: none;
+}
+.save-toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ===== Response Area ===== */
+.response-area {
+  display: none;
+  opacity: 0;
+  transform: translateY(12px);
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.response-area.visible {
+  display: block;
+  animation: responseIn 0.5s forwards;
+}
+@keyframes responseIn {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.response-card {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  padding: 24px 22px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+}
+
+.response-module {
+  margin-bottom: 20px;
+  padding: 16px 18px;
+  border-radius: var(--radius-sm);
+  border-left: 3px solid transparent;
+  animation: moduleIn 0.4s forwards;
+  opacity: 0;
+}
+.response-module:nth-child(1) { animation-delay: 0.1s; }
+.response-module:nth-child(2) { animation-delay: 0.2s; }
+.response-module:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes moduleIn {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.module-affirmation {
+  background: linear-gradient(135deg, #fdf2f2, #faf5f5);
+  border-left-color: var(--pink);
+}
+.module-soothe {
+  background: linear-gradient(135deg, #f7f3fa, #faf7fc);
+  border-left-color: var(--purple);
+}
+.module-action {
+  background: linear-gradient(135deg, #f4f8f2, #f8faf6);
+  border-left-color: var(--green);
+}
+
+.module-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.module-header .module-icon { font-size: 20px; }
+.module-body {
+  font-size: 15px;
+  line-height: 1.9;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+
+/* ===== Modal ===== */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(60,50,60,0.35);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 40px 16px;
+  overflow-y: auto;
+}
+.modal-overlay.open { display: flex; }
+
+.modal {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  padding: 28px 24px;
+  width: 100%;
+  max-width: 560px;
+  box-shadow: 0 12px 40px rgba(60,50,60,0.2);
+  animation: modalIn 0.3s ease-out;
+}
+@keyframes modalIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.modal-header h3 { font-size: 18px; color: var(--text); }
+.modal-close {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  transition: all var(--transition);
+}
+.modal-close:hover { background: var(--pink-light); color: var(--pink); }
+
+.history-list { display: flex; flex-direction: column; gap: 10px; max-height: 55vh; overflow-y: auto; }
+.history-item {
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all var(--transition);
+  background: var(--cream);
+}
+.history-item:hover {
+  border-color: var(--purple);
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-1px);
+}
+.history-item .hi-time { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+.history-item .hi-emotions { font-size: 13px; color: var(--text-light); margin-bottom: 4px; }
+.history-item .hi-preview { font-size: 14px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.history-empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 40px 20px;
+  font-size: 15px;
+}
+
+.history-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  justify-content: flex-end;
+}
+.history-actions .btn-sm {
+  padding: 6px 14px;
+  border-radius: 15px;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all var(--transition);
+  font-family: inherit;
+  color: var(--text-light);
+}
+.history-actions .btn-sm:hover { border-color: var(--purple); background: var(--purple-light); }
+.history-actions .btn-sm.danger:hover { border-color: var(--pink); background: var(--pink-light); color: #c97070; }
+
+/* ===== AI Settings ===== */
+.ai-section {
+  margin-top: 12px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--border);
+}
+.ai-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ai-toggle-label {
+  font-size: 13px;
+  color: var(--text-light);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.toggle-switch {
+  position: relative;
+  width: 44px; height: 24px;
+  background: #d5cfdf;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.3s;
+  flex-shrink: 0;
+}
+.toggle-switch.on { background: var(--purple); }
+.toggle-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 20px; height: 20px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.3s;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+}
+.toggle-switch.on::after { transform: translateX(20px); }
+.ai-key-row {
+  display: none;
+  margin-top: 10px;
+  gap: 8px;
+  align-items: center;
+}
+.ai-key-row.show { display: flex; }
+.ai-key-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  background: var(--cream);
+  color: var(--text);
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.3s;
+}
+.ai-key-input:focus { border-color: var(--purple); }
+.ai-key-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  display: none;
+}
+.ai-key-hint.show { display: block; }
+.ai-key-hint a { color: var(--purple); }
+.ai-status { font-size: 12px; padding: 4px 0; min-height: 18px; }
+.ai-status.ok { color: var(--green); }
+.ai-status.err { color: var(--pink); }
+
+/* ===== AI Provider Tabs ===== */
+.ai-provider-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.ai-provider-tab {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: var(--card-bg);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.3s;
+  font-family: inherit;
+  color: var(--text-light);
+}
+.ai-provider-tab.active {
+  border-color: var(--purple);
+  background: var(--purple-light);
+  color: #5e4e7a;
+  font-weight: 600;
+}
+.ai-provider-tab:hover {
+  border-color: var(--purple);
+}
+.ai-loading-bar {
+  display: none;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+.ai-loading-bar.show { display: block; }
+.ai-loading-bar .fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--purple), var(--pink));
+  border-radius: 2px;
+  animation: loadingBar 1.5s ease-in-out infinite;
+  width: 30%;
+}
+@keyframes loadingBar {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+
+/* ===== Context badge in response ===== */
+.context-badge {
+  display: inline-block;
+  background: var(--purple-light);
+  color: #5e4e7a;
+  font-size: 12px;
+  padding: 2px 10px;
+  border-radius: 10px;
+  margin-bottom: 10px;
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 480px) {
+  .container { gap: 14px; }
+  .card { padding: 18px 14px; }
+  .emotion-btn { padding: 6px 12px; font-size: 13px; }
+  .emotion-btn .emoji { font-size: 16px; }
+  .actions { flex-direction: column; }
+  .btn { width: 100%; }
+  .journal-textarea { min-height: 120px; font-size: 14px; }
+  .header { padding: 16px 12px 8px; }
+  .response-card { padding: 18px 14px; }
+  .response-module { padding: 12px 14px; }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Header -->
+  <div class="header">
+    <div class="date" id="headerDate"></div>
+    <div class="quote" id="headerQuote"></div>
+  </div>
+
+  <!-- Journal Card -->
+  <div class="card">
+    <div class="journal-label">
+      <span class="icon">📝</span> 今日随记
+    </div>
+    <textarea
+      class="journal-textarea"
+      id="journalInput"
+      placeholder="在这里写下你此刻的感受、想法或任何你想说的... 你的每一句话都值得被看见。"
+      maxlength="800"
+    ></textarea>
+    <div class="char-count" id="charCount">0 / 800</div>
+
+    <div class="emotion-section">
+      <div class="emotion-label">💭 此刻的心情（可多选）</div>
+      <div class="emotion-grid" id="emotionGrid"></div>
+    </div>
+
+    <!-- AI 增强开关 -->
+    <div class="ai-section">
+      <div class="ai-toggle-row">
+        <span class="ai-toggle-label">🤖 AI 增强分析</span>
+        <div class="toggle-switch" id="aiToggle" title="开启后使用 AI 生成个性化回应"></div>
+      </div>
+      <div class="ai-provider-tabs" id="aiProviderTabs" style="display:none;">
+          <button class="ai-provider-tab active" data-provider="dashscope">🪷 阿里百炼（免费）</button>
+          <button class="ai-provider-tab" data-provider="deepseek">🔥 DeepSeek</button>
+          <button class="ai-provider-tab" data-provider="local">💻 浏览器本地</button>
+          <button class="ai-provider-tab" data-provider="gemini">☁️ Gemini</button>
+          <button class="ai-provider-tab" data-provider="custom">🔌 自定义 API</button>
+        </div>
+      <div class="ai-key-row" id="aiKeyRow">
+        <input class="ai-key-input" id="aiKeyInput" type="password" placeholder="" />
+        <button class="btn-sm" id="btnSaveKey" style="flex-shrink:0;">保存</button>
+      </div>
+      <div class="ai-key-row" id="aiCustomUrlRow" style="display:none;">
+        <input class="ai-key-input" id="aiCustomUrl" type="text" placeholder="API 地址，如 https://api.openai.com/v1/chat/completions" />
+      </div>
+      <div class="ai-key-row" id="aiCustomModelRow" style="display:none;">
+        <input class="ai-key-input" id="aiCustomModel" type="text" placeholder="模型名，如 gpt-4o-mini" />
+      </div>
+      <div class="ai-key-hint" id="aiKeyHint">
+      </div>
+      <div class="ai-loading-bar" id="aiLoadingBar"><div class="fill"></div></div>
+      <div class="ai-status" id="aiStatus"></div>
+      <button class="btn-sm" id="btnPreload" style="display:none;margin-top:6px;width:100%;">⬇️ 预下载本地模型（约 1.5GB，下载后无需联网）</button>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-analyze" id="btnAnalyze">✨ 分析并显化</button>
+      <button class="btn btn-save" id="btnSave">💾 仅保存</button>
+    </div>
+  </div>
+
+  <!-- Save Toast -->
+  <div class="save-toast" id="saveToast"></div>
+
+  <!-- Response Area -->
+  <div class="response-area" id="responseArea">
+    <div class="response-card" id="responseCard"></div>
+  </div>
+
+  <!-- History Button -->
+  <button class="btn-history" id="btnHistory">📖 查看历史</button>
+    <button class="btn-history" id="btnExport" style="font-size:0.7rem;">💾 导出备份</button>
+    <button class="btn-history" id="btnImport" style="font-size:0.7rem;">📥 导入备份</button>
+    <input type="file" id="importFile" accept=".json" style="display:none;">
+</div>
+
+<!-- History Modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>📚 过往随记</h3>
+      <button class="modal-close" id="modalClose">&times;</button>
+    </div>
+    <div class="history-list" id="historyList"></div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// 心镜随记 · 显化情绪辅导助手 — 规则引擎 & 前端逻辑
+// ============================================================
+
+// ---- 疗愈短句库 ----
+const QUOTES = [
+  '你不需要完美，也值得被温柔以待。',
+  '此刻的呼吸，就是你与自己的连接。',
+  '慢慢来，你已经在路上了。',
+  '敏感不是弱点，是你感知世界的天赋。',
+  '今天你做的最勇敢的事，就是来到这里。',
+  '允许自己停一停，花开有时，你也一样。',
+  '你的感受都是真实的，不需要解释。',
+  '温柔地对待自己，就像对待最好的朋友。',
+  '不必急着"好起来"，存在本身就有意义。',
+  '你已经做得很好了，我为你感到骄傲。',
+  '有些日子就是这样，它不会定义你是谁。',
+  '休息是一种生产力，好好照顾自己是第一位。',
+];
+
+// ---- 情绪按钮定义 ----
+const EMOTIONS = [
+  { emoji: '😢', label: '低落', key: 'down' },
+  { emoji: '😡', label: '愤怒', key: 'angry' },
+  { emoji: '😰', label: '焦虑', key: 'anxious' },
+  { emoji: '😶', label: '麻木/解离', key: 'numb' },
+  { emoji: '🥹', label: '委屈', key: 'hurt' },
+  { emoji: '😤', label: '挫败', key: 'frustrated' },
+  { emoji: '🌈', label: '感恩', key: 'grateful' },
+  { emoji: '✨', label: '平静', key: 'calm' },
+];
+
+// ---- 关键词 → 情绪映射表（15+ 情绪词汇） ----
+const KEYWORD_EMOTION_MAP = {
+  // 低落 / 抑郁
+  down: ['低落','抑郁','难过','悲伤','难过','消沉','沉闷','不开心','没劲','无力','疲惫','累','空虚','孤独','寂寞','无助','绝望','想哭','哭','沉重','黑暗','没希望','失去','没意义'],
+  // 愤怒
+  angry: ['愤怒','生气','恼火','讨厌','烦人','暴躁','炸裂','火大','冒火','可恶','受不了','气死','发怒','怒吼','不爽'],
+  // 焦虑
+  anxious: ['焦虑','紧张','不安','担心','害怕','恐慌','恐惧','惊恐','忐忑','心神不宁','坐立不安','心悸','失控','不确定','未知','未来','失眠','睡不着','胡思乱想','停不下来'],
+  // 麻木 / 解离
+  numb: ['麻木','解离','不真实','恍惚','漂','游离','空白','无感','没有感觉','抽离','旁观','梦','隔着一层','没反应','反应迟钝','迟钝','呆滞','关机','空白感'],
+  // 委屈
+  hurt: ['委屈','冤枉','不公平','被误解','被忽视','被冷落','受伤','心碎','不被理解','被伤害','难过','哭','为什么','偏心','不公','凭什么'],
+  // 挫败
+  frustrated: ['挫败','失败','做不到','不行','太差','废物','无能','搞砸','犯错','错误','后悔','自责','内疚','不够好','比不上','落后','放弃','颓废','无能'],
+  // 感恩
+  grateful: ['感恩','感谢','感激','幸运','美好','幸福','温暖','珍惜','满足','小确幸','阳光','开心','快乐','美好'],
+  // 平静
+  calm: ['平静','安宁','安心','放松','舒适','惬意','稳定','安稳','平和','宁静','踏实'],
+  // 扩展情绪
+  shame: ['羞耻','丢脸','尴尬','难堪','自卑','不如人','抬不起头','不好意思'],
+  overwhelmed: ['崩溃','不堪重负','太多了','喘不过气','淹没','处理不来','超负荷','受不了','撑不住'],
+  lonely: ['孤单','寂寞','没人','独自','一个人','孤立','无援','被遗忘'],
+  grief: ['失去','离世','离开','告别','思念','怀念','去世','走了'],
+  jealousy: ['嫉妒','羡慕','不平衡','凭什么','ta有','我没有'],
+  confusion: ['困惑','迷茫','不知道','怎么办','迷失','找不到方向','混乱','糊涂'],
+  numbness_detail: ['解离','飘','不真实感','梦一样','看着自己','身体不属于我'],
+};
+
+// ---- 显化肯定语模板 ----
+const AFFIRMATION_TEMPLATES = {
+  down: [
+    '我此刻允许自己感受所有的情绪，同时我知道，平静和喜悦是我的自然状态。我正被宇宙温柔地承托着，每一天我都在回到属于自己的光中。',
+    '我已经在疗愈的旅程中了。我值得拥有轻盈的心情，就像河流最终归于大海，我自然而然地在流向平静与满足。',
+    '就在此刻，我选择温柔地对待自己。我感到一种深层的安宁正在升起，我知道，即便在低落中，我也在生长。',
+  ],
+  angry: [
+    '我已经释放了不再服务于我的愤怒。我的边界清晰而坚固，我选择用慈悲与力量面对一切。平静是我与生俱来的权利。',
+    '此刻我感到我的力量在转变——从灼热的愤怒，转化为清晰而坚定的自我守护。我安全，我强大，我被尊重。',
+    '我已经学会了用爱去表达我的边界。每一次呼吸，都让我更加平静，更加有力量地做自己。',
+  ],
+  anxious: [
+    '我现在选择将注意力带回当下。每一次呼吸都在提醒我：此刻，我是安全的，我是完整的，一切都在恰到好处地展开。',
+    '我已经拥有了面对未知的勇气。我把对未来的担忧，转化为对此刻的信任。宇宙的节奏从未出错过，而我在其中安然前行。',
+    '就在这个当下，我感到脚踩大地的踏实。焦虑只是思绪的云朵，而我是那一片永远澄澈的天空。',
+  ],
+  numb: [
+    '即使此刻感觉模糊，我仍与自己的身体和内心保持着温柔的连接。我是真实的，我的存在是有重量的，我正在慢慢地回到自己。',
+    '我已经在回归的途中。每一点细微的感受都值得被欢迎——一阵风、一缕光、皮肤上的温度——它们都在告诉我：我在，我是鲜活的。',
+    '我的身体是我的家园，我正在温柔地叩响门扉。不急，慢慢来，回家的路一直都在。',
+  ],
+  hurt: [
+    '我已经选择释放那些不属于我的负担。我的感受是正当的，我被看见，我被珍视。此刻，我允许自己被温柔包裹。',
+    '我正在收回自己的力量。那些让我感到委屈的经历，正在转化为我内在的慈悲与智慧。我值得被公平而温柔地对待。',
+    '此刻我选择将双手放在心口，对自己说：我在这里，我陪你。我的感受是真实的，而我的疗愈也同样是真实的。',
+  ],
+  frustrated: [
+    '我已经足够好了。每一次尝试都在构建我的力量，所谓"失败"只是通向目标的必经之路。此时此刻，我全然接纳正在成长的自己。',
+    '我正在学习用温柔的目光看待自己的努力。我做过的每一步都算数，我正在进步，即使此刻看不清全貌。',
+    '我放下对完美的苛求，拥抱正在过程中的自己。每一个"不够好"的念头，都在被我转化为"我已尽力"的温柔接纳。',
+  ],
+  grateful: [
+    '我已经拥有如此多的丰盛。每一次感恩都在扩大我内心的光，而我允许这份光遍布我的整个存在。',
+    '此刻我沉浸在圆满之中。感恩不是寻找美好，而是认出美好早已在我身边。我活在丰盛之中。',
+    '我正在被无数微小而确切的幸福包围。每一次呼吸都是礼物，每一个当下都是馈赠。',
+  ],
+  calm: [
+    '我已经抵达了内心的宁静之地。这份平静是我与生俱来的底色，无论外界如何变化，我都能回归到这份安宁之中。',
+    '此刻的平静，正在滋养我的每一个细胞。我与自己和谐相处，这份安详扩散到我生活的每一个角落。',
+    '我即是平静本身。在宁静中，我听见内心最真实的声音，它温柔而坚定地引导着我。',
+  ],
+  default: [
+    '我正在学习更深入地看见自己。每一天我都在更靠近真实的自己，而这个过程本身就是最珍贵的礼物。',
+    '我的所有感受都是被允许的，而我始终在成长和疗愈的途中。此刻，我选择与自己和好。',
+    '我已经如此勇敢地面对了自己。每一次书写，每一次觉察，都是我在对自己说：你很重要。',
+  ],
+};
+
+// ---- CPTSD & ADHD 安抚模板 ----
+const SOOTHE_TEMPLATES = {
+  numb: {
+    grounding: '🌿 Grounding 练习（5-4-3-2-1）\n当你感到解离或麻木时，试着和当下建立温柔的连接：\n• 看：找出你周围 5 样你能看到的东西（灯、窗帘的褶皱、杯子的颜色）\n• 触：感受 4 样你能触碰到的物体（桌面的纹理、衣服的柔软）\n• 听：仔细听 3 种声音（远处的车声、自己的呼吸声、键盘的轻响）\n• 闻：找出 2 种气味（空气的味道、书本的纸香）\n• 尝：感受 1 种味道（喝一口水，感受水温）\n\n不需要全部做完，哪怕只做第一步也已经很棒了。你正在用自己的节奏回到身体里。',
+  },
+  frustrated: {
+    microtask: '🧩 ADHD 友善的微任务拆解\n当你感到启动困难或挫败时，试试把一切变小：\n• 不需要"完成那件事"，只需要打开它——打开文档本身就够了\n• 不需要"整理房间"，只需要拿起一件物品放回原位\n• 你不需要"做好"，你只需要"开始 2 分钟"\n\n任务不分大小，每一个微小步骤都值得被认可。你不需要一次性面对全部，慢慢来，你已经很努力了。',
+  },
+  triggered: {
+    container: '🫙 容器技术（Container）\n如果你感到被某个记忆或情绪淹没，可以试试这个：\n• 想象一个安全而坚固的容器——它可以是一个盒子、一个罐子、一间小屋\n• 轻轻地把那些过于强烈、暂时无法处理的感觉"放进去"\n• 对自己说："我看到了这些感受，我现在先把它们放在这里，等我有更多资源时再来面对"\n• 这个容器随时可以打开，也随时可以关上，你是它的主人\n\n你不需要现在就去处理所有。先让自己喘口气是完全可以的。',
+  },
+  default: {
+    general: '🧠 温柔的安抚\n无论你正在经历什么，你此刻的感受都是真实且有效的。你不需要为自己的情绪道歉，也不需要急着"好起来"。\n\n• 试着把手放在心口，感受掌心的温度\n• 慢慢地做三次深呼吸——吸气时数 4，屏息 2，呼气 6\n• 对自己轻轻地说一句："我在这里，我陪着你"\n\n你的神经系统在努力保护你，它只是有时候太累了。给它一点时间，也给自己一点耐心。',
+  },
+};
+
+// ---- 微小行动方案模板 ----
+const ACTION_TEMPLATES = {
+  down: [
+    '把手右手轻轻放在心口上，闭上眼睛，慢慢地呼吸三次。感受胸腔的起伏，无需改变任何情绪，只是观察。',
+    '去接一杯温水，双手捧着杯子，感受温度从掌心蔓延。慢慢地喝三口，每喝一口对自己说："我在这里。"',
+    '打开窗户或走到阳台，看一看天空——不管是蓝色、灰色还是黑色，看看云的形状，待 1 分钟就好。',
+  ],
+  angry: [
+    '找一张纸，用最大的力气在上面胡乱涂画 30 秒。不必画任何具体的东西，让笔尖代替你释放那股能量。',
+    '双手握拳，用力攥紧 5 秒钟，然后一下子松开。重复 3 次，感受紧张释放后手指的微麻感。',
+    '离开当前的空间，走一小段路（哪怕只是去洗手间），用水的凉意轻拍后颈和手腕。',
+  ],
+  anxious: [
+    '做一次"方形呼吸"：吸气 4 秒→屏息 4 秒→呼气 4 秒→屏息 4 秒。重复 3 轮就好。',
+    '环顾四周，默默给眼前的事物命名颜色："米色的窗帘、深棕色的桌子、白色的灯..."。说出 5 个就够。',
+    '把肩膀耸到耳朵，绷紧 5 秒，然后让它们"掉"下来。感受肩膀松开后的轻松感。',
+  ],
+  numb: [
+    '摸一摸身边最近的三样东西，感受它们的温度和质感。在脑中描述它们："凉的、粗糙的、光滑的..."',
+    '喝一小口水，让水在口腔里停留 5 秒再慢慢咽下。感受水滑过喉咙的感觉。',
+    '站起来，踮起脚尖再放下，重复 5 次。感受小腿肌肉的紧张和放松。',
+  ],
+  hurt: [
+    '给自己一个温柔的拥抱：双臂交叉，轻轻抱住自己的上臂，停留 20 秒。让身体的温度告诉你：你被关怀着。',
+    '在一张纸上写下："我允许自己感到______"。然后把这句完整的话放在你能看到的地方。',
+    '播放一首你觉得安全或温暖的音乐，闭上眼睛只听 3 分钟，不做任何其他事。',
+  ],
+  frustrated: [
+    '选一件只需要 2 分钟就能完成的小事去做（擦一下桌面、倒一杯水、叠一件衣服）。完成后对自己说："做到了。"',
+    '写下任何一件你今天已经完成的事——哪怕是"起床了"这么小。然后画一个✓在旁边。',
+    '把接下来要做的事写在便签上，只写第一步。例如不是"写报告"，而是"打开文档"。就这一步。',
+  ],
+  grateful: [
+    '在脑中或纸上列出今天 3 件让你感到微小温暖的事。不需要"大事"，阳光照在脸上也算。',
+    '给一个你在意的人发一条简短的消息，只说一句感谢或想念。不求回复，只是把温暖传递出去。',
+    '坐下闭上眼睛，回忆一个让你微笑的瞬间。在脑海中把这个画面放大、加上色彩、延长几秒。',
+  ],
+  calm: [
+    '享受这一刻的平静。闭上眼，感受 3 次完整的呼吸，在心里对自己说："这一切都刚刚好。"',
+    '把这份平静的感觉记录在纸上或手机上：现在的身体感觉是怎样的？脑海里的声音是安静的吗？收藏这个时刻。',
+    '带着这份平静，给自己设定一个小小的意图，比如："今天我选择用温柔的态度对待自己。"',
+  ],
+  default: [
+    '停下来，喝一口水。感受水流入身体的路径。这是你现在唯一需要做的事。',
+    '把手轻轻放在肚子上，做三次腹式深呼吸。吸气和呼气时都让肚子自然地鼓起和回落。',
+    '环视周围，找到一样你觉得颜色好看的东西，盯着它看 10 秒。描述它给你的感觉。',
+  ],
+};
+
+// ---- 场景/事件关键词映射（用于建议与具体事件关联） ----
+const CONTEXT_KEYWORD_MAP = {
+  work: {
+    label: '工作', keywords: ['工作','上班','加班','老板','领导','同事','项目','任务','会议','汇报','绩效','考核','裁员','辞职','跳槽','职场','996','报告','邮件','deadline','截止','进度','需求','客户','甲方','方案','出差','面试','offer'],
+  },
+  study: {
+    label: '学业', keywords: ['学习','考试','作业','论文','毕业','学校','老师','同学','成绩','挂科','考研','复习','上课','课程','课题','答辩','背','记不住','阅读','图书馆','升学','志愿','专业'],
+  },
+  relationship: {
+    label: '关系', keywords: ['恋爱','分手','对象','男朋友','女朋友','伴侣','爱人','吵架','冷战','出轨','第三者','相亲','表白','暗恋','追求','前任','老公','老婆','婚姻','离婚','家庭','婆婆','丈母娘','结婚'],
+  },
+  family: {
+    label: '家庭', keywords: ['爸妈','父母','妈妈','爸爸','孩子','儿女','兄弟姐妹','亲戚','回家','团聚','养老','代沟','管教','子女','原生家庭','小时候','童年','家暴'],
+  },
+  self: {
+    label: '自我', keywords: ['自己','自我','自信','自尊','价值','意义','人生','未来','方向','迷茫','成长','改变','拖延','自律','习惯','迷茫','不知道怎么办','怀疑自己','否定自己','讨厌自己'],
+  },
+  social: {
+    label: '社交', keywords: ['朋友','社交','聚会','人际关系','圈子','孤立','排挤','合群','社恐','尴尬','交流','互动','不回消息','拉黑','屏蔽','朋友圈','评价','别人怎么看我'],
+  },
+  health: {
+    label: '健康', keywords: ['身体','生病','疼痛','失眠','头痛','胃痛','疲劳','无力','体检','诊断','症状','复发','药','治疗','康复','医生','医院','睡不着','睡眠'],
+  },
+  finance: {
+    label: '经济', keywords: ['钱','没钱','穷','工资','收入','房租','贷款','账单','花呗','信用卡','还款','理财','省','开销','消费','穷困','压力大','经济'],
+  },
+};
+
+// ---- 场景关联的显化肯定语补充 ----
+const CONTEXT_AFFIRMATION_HINTS = {
+  work: '在工作中，我已经拥有足够的智慧和创造力去应对挑战。我的价值不取决于任何一份工作，我就是足够的。',
+  study: '学习是我与自己对话的一种方式。我已经在积累知识的旅途中，每一步都在塑造更完整的自己。',
+  relationship: '我已经在关系中学会了设立健康的边界。我值得被尊重、被珍惜，爱是以温柔的方式自然流动的。',
+  family: '我已经拥有来自内在的安全感。家庭的模式不会再定义我，我正在创造属于自己的温暖与秩序。',
+  self: '我已经是完整而独特的自己。每一次自我怀疑都是一次重新确认——我在，我值得，我够好。',
+  social: '我已经拥有与真实自我连接的社交方式。我不需要讨好任何人，温柔而坚定地做自己就足够吸引同频的人。',
+  health: '我的身体已经在用它的方式与我沟通。我正在学会倾听身体的声音，并用温柔的方式照料它。',
+  finance: '我已经在建立与金钱的健康关系。丰盛不是数字，而是对已有资源的感恩和智慧的使用。',
+};
+
+// ---- 场景关联的行动建议 ----
+const CONTEXT_ACTIONS = {
+  work: [
+    '把今天让你感到压力的那件事，用一句话写下来。然后问自己："这件事一个月后还重要吗？"',
+    '打开你的任务列表，只圈出最优先的 1 项，然后把其他所有项目折叠或隐藏。',
+    '在工位上做一次 30 秒的"感官暂停"：闭上眼睛，注意你听到的 3 种声音，然后慢慢睁开。',
+  ],
+  study: [
+    '把眼前的学习材料拆成 3 个 10 分钟的小块。设置一个 10 分钟定时器，只专注第一块，结束就休息。',
+    '拿出一张纸，用你自己的话重新解释你正在学的概念——就像你在教一个朋友。',
+    '站起来走动 2 分钟，活动一下肩膀。回到书桌前喝一口水，再决定是否继续。',
+  ],
+  relationship: [
+    '在一张纸上写下："在这段关系中，我需要的是______"。不用给任何人看，只是写给自己。',
+    '如果此刻情绪很强烈，先停下来，把手放在心口说："我的感受是真实的，我不需要立刻回应。"',
+    '想一想：如果换做你最好的朋友遇到同样的情况，你会对 ta 说什么？把这句话对自己说一遍。',
+  ],
+  family: [
+    '在脑中或纸上画出你的"安全空间"——它可以是一个真实的房间，也可以是想象的地方。描述它的细节。',
+    '如果家庭话题让你感到耗竭，给自己一个明确的暂停："我今天只需要照顾自己，不需要解决任何人的问题。"',
+    '写下一件不来自家庭的、属于你自己的小小成就或特质。它提醒你：你是独立的个体。',
+  ],
+  self: [
+    '对着镜子（或手机前置摄像头），看着自己的眼睛说："我看见你了，你正在努力，这就足够了。"',
+    '写下今天你已经完成的 3 件事——哪怕小到"刷牙洗脸"。每写一个，在后面画一个 ✓。',
+    '选一个你对自己经常说的批评话语，想一想：如果你的好朋友对 ta 自己说这句话，你会怎么回应？',
+  ],
+  social: [
+    '如果社交让你疲惫，允许自己今天只回复一条消息——或者干脆不回复。你的能量边界是正当的。',
+    '想一想最近一次让你感到舒适的社交互动。那个人或那个场景有什么特质？把这些写下来。',
+    '做一个"社交能量账本"：列出 3 个给你能量的人和 3 个消耗你能量的事务。今天优先联系前者。',
+  ],
+  health: [
+    '把右手放在不舒服的部位附近（不一定是直接接触），闭上眼睛，做 3 次缓慢呼吸，像在和身体对话。',
+    '写下今天你的身体传递给你的一个信号（例如"肩膀很紧"），然后问自己："它在试图告诉我什么？"',
+    '喝一杯温热的水，感受它从喉咙到胃的路径。这是你今天能为身体做的最简单也最温柔的事。',
+  ],
+  finance: [
+    '写下当下最让你焦虑的一笔支出或数字。然后在旁边写一句话："这个数字不能定义我的价值。"',
+    '列出三样你已经拥有且不需要花钱的东西——例如健康的双腿、一杯干净的水、窗外的阳光。',
+    '如果可以，今天做一个 1 元的"微储蓄"——只是把 1 块钱放进另一个账户或罐子里。这个动作的意义在于：你在为自己做点什么。',
+  ],
+};
+
+// ---- 状态管理 ----
+let selectedEmotions = [];
+
+// ---- 初始化 ----
+document.addEventListener('DOMContentLoaded', () => {
+  initHeader();
+  initEmotionButtons();
+  initCharCount();
+  initButtons();
+  initModal();
+  initAI();
+});
+
+// ---- 头部日期 & 随机短句 ----
+function initHeader() {
+  const now = new Date();
+  const weekdays = ['日','一','二','三','四','五','六'];
+  const dateStr = `${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日 · 星期${weekdays[now.getDay()]}`;
+  document.getElementById('headerDate').textContent = dateStr;
+
+  const randomQuote = QUOTES[Math.floor(Math.random() * QUOTES.length)];
+  document.getElementById('headerQuote').textContent = `"${randomQuote}"`;
+}
+
+// ---- 情绪按钮 ----
+function initEmotionButtons() {
+  const grid = document.getElementById('emotionGrid');
+  EMOTIONS.forEach((em, idx) => {
+    const btn = document.createElement('button');
+    btn.className = 'emotion-btn';
+    btn.innerHTML = `<span class="emoji">${em.emoji}</span> ${em.label}`;
+    btn.dataset.key = em.key;
+    btn.addEventListener('click', () => toggleEmotion(em.key, btn));
+    grid.appendChild(btn);
+  });
+}
+
+function toggleEmotion(key, btn) {
+  const idx = selectedEmotions.indexOf(key);
+  if (idx > -1) {
+    selectedEmotions.splice(idx, 1);
+    btn.classList.remove('active');
+  } else {
+    if (selectedEmotions.length >= 3) {
+      // 自动移除最早选中的
+      const oldest = selectedEmotions.shift();
+      const oldBtn = document.querySelector(`.emotion-btn[data-key="${oldest}"]`);
+      if (oldBtn) oldBtn.classList.remove('active');
+    }
+    selectedEmotions.push(key);
+    btn.classList.add('active');
+  }
+}
+
+// ---- 字数统计 ----
+function initCharCount() {
+  const input = document.getElementById('journalInput');
+  const count = document.getElementById('charCount');
+  input.addEventListener('input', () => {
+    const len = input.value.length;
+    count.textContent = `${len} / 800`;
+    count.className = 'char-count';
+    if (len > 700) count.classList.add('warn');
+    if (len >= 800) count.classList.add('limit');
+  });
+}
+
+// ---- 操作按钮 ----
+function initButtons() {
+  document.getElementById('btnAnalyze').addEventListener('click', handleAnalyze);
+  document.getElementById('btnSave').addEventListener('click', handleSave);
+  document.getElementById('btnHistory').addEventListener('click', openModal);
+  document.getElementById('btnExport').addEventListener('click', exportBackup);
+  document.getElementById('btnImport').addEventListener('click', () => document.getElementById('importFile').click());
+  document.getElementById('importFile').addEventListener('change', importBackup);
+}
+
+// ---- 分析并显化 ----
+async function handleAnalyze() {
+  const text = document.getElementById('journalInput').value.trim();
+  const emotions = [...selectedEmotions];
+  const responseArea = document.getElementById('responseArea');
+  const responseCard = document.getElementById('responseCard');
+
+  // 边缘情况：无文字也无情绪
+  if (!text && emotions.length === 0) {
+    responseCard.innerHTML = buildResponse('default', [], '', []);
+    showResponse(responseArea);
+    responseCard.querySelector('.response-module').insertAdjacentHTML('afterbegin',
+      '<p style="color:#c4a882;margin-bottom:12px;font-size:14px;">💛 你还没有写下任何内容呢～没关系，有时候开始是最难的一步。试试写下一个词，哪怕只是"今天"，就已经是一个很棒的开始了。</p>'
+    );
+    return;
+  }
+
+  // 如果没有选情绪，从文本推断
+  let finalEmotions = emotions;
+  if (finalEmotions.length === 0 && text) {
+    finalEmotions = inferEmotions(text);
+    if (finalEmotions.length > 0) {
+      finalEmotions.forEach(key => {
+        const btn = document.querySelector(`.emotion-btn[data-key="${key}"]`);
+        if (btn) {
+          btn.classList.add('active');
+          if (!selectedEmotions.includes(key)) selectedEmotions.push(key);
+        }
+      });
+    }
+  }
+
+  // 提取场景/事件上下文
+  const contexts = text ? extractContext(text) : [];
+
+  // AI 模式
+  if (aiEnabled && text) {
+    // 检查 provider 是否可用
+    const needsKey = (aiProvider === 'dashscope' || aiProvider === 'deepseek' || aiProvider === 'gemini' || aiProvider === 'custom');
+    const hasKey = aiProvider === 'dashscope' ? !!dashscopeApiKey : aiProvider === 'deepseek' ? !!deepseekApiKey : aiProvider === 'gemini' ? !!geminiApiKey : aiProvider === 'custom' ? !!customApiUrl : false;
+    if (needsKey && !hasKey) {
+      const name = aiProvider === 'dashscope' ? '阿里百炼' : aiProvider === 'deepseek' ? 'DeepSeek' : aiProvider === 'gemini' ? 'Gemini' : '自定义 API';
+      responseCard.innerHTML = `
+        <div class="response-module module-affirmation" style="margin-bottom:12px;">
+          <div class="module-header"><span class="module-icon">⚠️</span> ${name} 未配置 API Key</div>
+          <div class="module-body" style="color:var(--pink);">请填入 ${name} API Key，或切换到其他 AI 模式。</div>
+        </div>`;
+      showResponse(responseArea);
+      return;
+    }
+
+    const providerLabels = { dashscope: '阿里百炼', deepseek: 'DeepSeek', local: '本地模型', gemini: 'Gemini' };
+    const providerLabel = providerLabels[aiProvider] || 'AI';
+    const providerHint = aiProvider === 'local' ? '首次使用需下载模型（约 1.5GB），后续将秒开...' : `正在连接 ${providerLabel}...`;
+    responseCard.innerHTML = `
+      <div class="response-module module-affirmation">
+        <div class="module-header"><span class="module-icon">🤖</span> AI 正在分析（${providerLabel}）...</div>
+        <div class="module-body" style="color:var(--text-muted);">${providerHint}</div>
+      </div>`;
+    showResponse(responseArea);
+
+    try {
+      const prompt = buildAIPrompt(text, finalEmotions, contexts);
+      const aiText = await callAI(prompt);
+      responseCard.innerHTML = parseAIResponse(aiText, contexts, providerLabel);
+      showResponse(responseArea);
+    } catch (err) {
+      // 降级到规则引擎
+      const fallbackHtml = buildResponse(
+        finalEmotions.length > 0 ? finalEmotions[0] : 'default',
+        finalEmotions, text, contexts
+      );
+      responseCard.innerHTML = `
+        <div class="response-module module-affirmation" style="margin-bottom:12px;">
+          <div class="module-header"><span class="module-icon">⚠️</span> AI 请求失败，已切换规则引擎</div>
+          <div class="module-body" style="color:var(--pink);">${escapeHtml(err.message)}</div>
+        </div>
+        ${fallbackHtml}`;
+      showResponse(responseArea);
+    }
+    return;
+  }
+
+  // 规则引擎模式
+  responseCard.innerHTML = buildResponse(
+    finalEmotions.length > 0 ? finalEmotions[0] : 'default',
+    finalEmotions,
+    text,
+    contexts
+  );
+  showResponse(responseArea);
+}
+
+// 解析 AI 返回的文本，拆分为三个模块
+function parseAIResponse(aiText, contexts, providerLabel = 'AI') {
+  let aff = '', soothe = '', action = '';
+
+  // 按【】分割
+  const parts = aiText.split(/【(.+?)】/);
+  for (let i = 1; i < parts.length; i += 2) {
+    const label = parts[i];
+    const content = (parts[i + 1] || '').trim();
+    if (label.includes('显化') || label.includes('肯定')) {
+      aff = content;
+    } else if (label.includes('安抚') || label.includes('情绪')) {
+      soothe = content;
+    } else if (label.includes('行动') || label.includes('方案')) {
+      action = content;
+    }
+  }
+
+  // 如果分割失败，把全部内容放安抚区
+  if (!aff && !soothe && !action) {
+    soothe = aiText;
+  }
+
+  const ctxBadge = contexts.length > 0
+    ? `<span class="context-badge">📌 关联场景：${contexts.map(k => CONTEXT_KEYWORD_MAP[k]?.label || k).join('、')}</span>`
+    : '';
+
+  const aiBadge = `<div style="text-align:center;margin-bottom:12px;font-size:0.75rem;color:var(--text-muted);">✨ 由 ${providerLabel} AI 实时生成</div>`;
+
+  return `
+    ${aiBadge}
+    <div class="response-module module-affirmation">
+      <div class="module-header"><span class="module-icon">💫</span> 显化肯定语</div>
+      ${ctxBadge}
+      <div class="module-body">${(aff || '我正在学习更深入地看见自己。每一天我都在更靠近真实的自己。').replace(/\n/g, '<br>')}</div>
+    </div>
+    <div class="response-module module-soothe">
+      <div class="module-header"><span class="module-icon">🧠</span> 情绪安抚（CPTSD / ADHD）</div>
+      <div class="module-body">${(soothe || '你此刻的感受都是真实且有效的。给自己一点时间，也给自己一点耐心。').replace(/\n/g, '<br>')}</div>
+    </div>
+    <div class="response-module module-action">
+      <div class="module-header"><span class="module-icon">🌿</span> 微小行动方案</div>
+      <div class="module-body">${(action || '1. 停下来，喝一口水。\n2. 把手放在心口，慢慢呼吸三次。').replace(/\n/g, '<br>')}</div>
+    </div>
+  `;
+}
+
+function showResponse(area) {
+  area.classList.remove('visible');
+  void area.offsetWidth; // reflow
+  area.classList.add('visible');
+  area.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ---- 构建回应（规则引擎 + 场景上下文） ----
+function buildResponse(primaryEmotion, allEmotions, text, contexts) {
+  const html = [];
+
+  // 场景上下文标签
+  const ctxBadge = contexts.length > 0
+    ? `<span class="context-badge">📌 关联场景：${contexts.map(k => CONTEXT_KEYWORD_MAP[k]?.label || k).join('、')}</span>`
+    : '';
+
+  // 1) 显化肯定语
+  const affirmations = AFFIRMATION_TEMPLATES[primaryEmotion] || AFFIRMATION_TEMPLATES.default;
+  let affText = affirmations[Math.floor(Math.random() * affirmations.length)];
+
+  // 如果有场景上下文，追加场景相关的肯定语
+  if (contexts.length > 0) {
+    const ctxHints = contexts
+      .filter(k => CONTEXT_AFFIRMATION_HINTS[k])
+      .map(k => CONTEXT_AFFIRMATION_HINTS[k]);
+    if (ctxHints.length > 0) {
+      affText += '\n\n' + ctxHints[Math.floor(Math.random() * ctxHints.length)];
+    }
+  }
+
+  html.push(`
+    <div class="response-module module-affirmation">
+      <div class="module-header"><span class="module-icon">💫</span> 显化肯定语</div>
+      ${ctxBadge}
+      <div class="module-body">${affText}</div>
+    </div>
+  `);
+
+  // 2) 情绪安抚
+  let sootheHtml = '';
+  const hasNumb = allEmotions.includes('numb');
+  const hasFrustrated = allEmotions.includes('frustrated');
+  const triggeredKw = ['创伤','闪回','噩梦','触发','过去的','小时候','回忆涌','突然想起'];
+  const hasTriggered = triggeredKw.some(kw => text.includes(kw));
+
+  if (hasNumb && SOOTHE_TEMPLATES.numb) {
+    sootheHtml += `<p>${SOOTHE_TEMPLATES.numb.grounding.replace(/\n/g, '<br>')}</p>`;
+  }
+  if (hasFrustrated && SOOTHE_TEMPLATES.frustrated) {
+    // 如果有场景上下文，让微任务与场景关联
+    let microTask = SOOTHE_TEMPLATES.frustrated.microtask;
+    if (contexts.length > 0) {
+      const ctxLabel = CONTEXT_KEYWORD_MAP[contexts[0]]?.label || '';
+      microTask = microTask.replace(
+        '你不需要"做好"，你只需要"开始 2 分钟"',
+        `你不需要一次性面对与${ctxLabel}相关的所有事，你只需要"开始 2 分钟"`
+      );
+    }
+    sootheHtml += `<p>${microTask.replace(/\n/g, '<br>')}</p>`;
+  }
+  if (hasTriggered && SOOTHE_TEMPLATES.triggered) {
+    sootheHtml += `<p>${SOOTHE_TEMPLATES.triggered.container.replace(/\n/g, '<br>')}</p>`;
+  }
+  if (!sootheHtml) {
+    sootheHtml = `<p>${SOOTHE_TEMPLATES.default.general.replace(/\n/g, '<br>')}</p>`;
+  }
+
+  html.push(`
+    <div class="response-module module-soothe">
+      <div class="module-header"><span class="module-icon">🧠</span> 情绪安抚（CPTSD / ADHD）</div>
+      <div class="module-body">${sootheHtml}</div>
+    </div>
+  `);
+
+  // 3) 微小行动方案（优先使用场景关联建议）
+  let actions;
+  if (contexts.length > 0) {
+    // 优先从场景关联中取
+    const ctxActionLists = contexts
+      .filter(k => CONTEXT_ACTIONS[k])
+      .map(k => CONTEXT_ACTIONS[k]);
+    if (ctxActionLists.length > 0) {
+      // 合并多个场景的建议，随机取 2 条
+      const merged = ctxActionLists.flat();
+      const shuffled = [...merged].sort(() => Math.random() - 0.5);
+      actions = shuffled.slice(0, 2);
+    } else {
+      actions = (ACTION_TEMPLATES[primaryEmotion] || ACTION_TEMPLATES.default).slice(0, 2);
+    }
+  } else {
+    actions = ACTION_TEMPLATES[primaryEmotion] || ACTION_TEMPLATES.default;
+    const count = Math.min(2, actions.length);
+    actions = [...actions].sort(() => Math.random() - 0.5).slice(0, count);
+  }
+
+  // 确保永远有至少 1 条
+  if (!actions || actions.length === 0) {
+    actions = ACTION_TEMPLATES.default.slice(0, 2);
+  }
+
+  const actionHtml = actions.map((a, i) => `<p>${i + 1}. ${a}</p>`).join('');
+
+  html.push(`
+    <div class="response-module module-action">
+      <div class="module-header"><span class="module-icon">🌿</span> 微小行动方案</div>
+      <div class="module-body">${actionHtml}</div>
+    </div>
+  `);
+
+  return html.join('');
+}
+
+// ---- 情绪推断（规则引擎） ----
+function inferEmotions(text) {
+  const scores = {};
+  for (const [emotion, keywords] of Object.entries(KEYWORD_EMOTION_MAP)) {
+    let score = 0;
+    for (const kw of keywords) {
+      if (text.includes(kw)) {
+        score += kw.length >= 3 ? 3 : 1; // 长词匹配权重更高
+      }
+    }
+    if (score > 0) scores[emotion] = score;
+  }
+  // 按分数排序，取前 2 个
+  const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+  return sorted.slice(0, 2).map(([em]) => em);
+}
+
+// ---- 场景/事件提取（让建议与具体内容关联） ----
+function extractContext(text) {
+  const scores = {};
+  for (const [ctxKey, ctxData] of Object.entries(CONTEXT_KEYWORD_MAP)) {
+    let score = 0;
+    for (const kw of ctxData.keywords) {
+      if (text.includes(kw)) {
+        score += kw.length >= 3 ? 3 : 1;
+      }
+    }
+    if (score > 0) scores[ctxKey] = score;
+  }
+  const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+  return sorted.slice(0, 2).map(([key]) => key);
+}
+
+// ---- AI 增强：三引擎（DeepSeek / 浏览器本地 / Gemini） ----
+let aiEnabled = false;
+let aiProvider = 'dashscope';   // 'dashscope' | 'deepseek' | 'local' | 'gemini'
+let geminiApiKey = '';
+let deepseekApiKey = '';
+let dashscopeApiKey = '';
+let customApiKey = '';
+let customApiUrl = '';
+let customApiModel = 'gpt-4o-mini';
+let localEngine = null;
+
+// 支持的本地模型（按大小排序，优先用小模型）
+const LOCAL_MODEL = 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC'; // ~1.5GB，中文友好
+// ModelScope 国内直链（HuggingFace 被墙，ModelScope 稳定且支持 CORS）
+const MODEL_BASE_URL = 'https://modelscope.cn/models/mlc-ai/Qwen2.5-1.5B-Instruct-q4f16_1-MLC/resolve/master/';
+
+// 初始化 AI 设置
+function initAI() {
+  const toggle = document.getElementById('aiToggle');
+  const keyRow = document.getElementById('aiKeyRow');
+  const keyInput = document.getElementById('aiKeyInput');
+  const keyHint = document.getElementById('aiKeyHint');
+  const saveBtn = document.getElementById('btnSaveKey');
+  const status = document.getElementById('aiStatus');
+  const providerTabs = document.getElementById('aiProviderTabs');
+  const loadingBar = document.getElementById('aiLoadingBar');
+  const preloadBtn = document.getElementById('btnPreload');
+
+  // 恢复保存的 Key
+  const savedDashScope = localStorage.getItem('xinjing_ds_key');
+  if (savedDashScope) dashscopeApiKey = savedDashScope;
+  const savedDeepSeek = localStorage.getItem('xinjing_ds2_key');
+  if (savedDeepSeek) deepseekApiKey = savedDeepSeek;
+  const savedGemini = localStorage.getItem('xinjing_gm_key');
+  if (savedGemini) geminiApiKey = savedGemini;
+  const savedCustomKey = localStorage.getItem('xinjing_cu_key');
+  if (savedCustomKey) customApiKey = savedCustomKey;
+  const savedCustomUrl = localStorage.getItem('xinjing_cu_url');
+  if (savedCustomUrl) customApiUrl = savedCustomUrl;
+  const savedCustomModel = localStorage.getItem('xinjing_cu_model');
+  if (savedCustomModel) customApiModel = savedCustomModel;
+
+  // 恢复 provider 偏好
+  const savedProvider = localStorage.getItem('xinjing_ai_provider');
+  if (savedProvider) aiProvider = savedProvider;
+
+  const customUrlRow = document.getElementById('aiCustomUrlRow');
+  const customModelRow = document.getElementById('aiCustomModelRow');
+  const customUrlInput = document.getElementById('aiCustomUrl');
+  const customModelInput = document.getElementById('aiCustomModel');
+
+  // 根据 provider 显示对应的 key
+  function syncKeyUI() {
+    const needsKey = aiProvider === 'dashscope' || aiProvider === 'deepseek' || aiProvider === 'gemini' || aiProvider === 'custom';
+    keyRow.classList.toggle('show', aiEnabled && needsKey);
+    keyHint.classList.toggle('show', aiEnabled && needsKey);
+    preloadBtn.style.display = (aiEnabled && aiProvider === 'local') ? 'block' : 'none';
+    const isCustom = aiEnabled && aiProvider === 'custom';
+    customUrlRow.style.display = isCustom ? 'flex' : 'none';
+    customModelRow.style.display = isCustom ? 'flex' : 'none';
+
+    if (aiProvider === 'dashscope') {
+      keyInput.placeholder = '输入阿里百炼 API Key（每月免费 200 万 tokens）';
+      keyInput.value = dashscopeApiKey || '';
+      keyHint.innerHTML = '免费获取 Key：<a href="https://bailian.console.aliyun.com/?apiKey=1" target="_blank">阿里百炼控制台</a>（实名后每月免费 200 万 tokens，国内直连）';
+    } else if (aiProvider === 'deepseek') {
+      keyInput.placeholder = '输入 DeepSeek API Key（注册即送免费额度）';
+      keyInput.value = deepseekApiKey || '';
+      keyHint.innerHTML = '免费获取 Key：<a href="https://platform.deepseek.com/api_keys" target="_blank">DeepSeek 开放平台</a>（注册即送 10 元额度，国内直连）';
+    } else if (aiProvider === 'gemini') {
+      keyInput.placeholder = '输入 Gemini API Key';
+      keyInput.value = geminiApiKey || '';
+      keyHint.innerHTML = '免费获取 Key：<a href="https://aistudio.google.com/apikey" target="_blank">Google AI Studio</a>（需科学上网，每分钟 15 次免费）';
+    } else if (aiProvider === 'custom') {
+      keyInput.placeholder = '输入 API Key（可选，如不需要可留空）';
+      keyInput.value = customApiKey || '';
+      customUrlInput.value = customApiUrl || '';
+      customModelInput.value = customApiModel || '';
+      keyHint.innerHTML = '支持任意兼容 OpenAI Chat Completions 格式的 API（如 Ollama、硅基流动、OpenRouter 等）';
+    }
+  }
+
+  // Provider 标签切换
+  providerTabs.querySelectorAll('.ai-provider-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.provider === aiProvider);
+    tab.addEventListener('click', () => {
+      aiProvider = tab.dataset.provider;
+      localStorage.setItem('xinjing_ai_provider', aiProvider);
+      providerTabs.querySelectorAll('.ai-provider-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      syncKeyUI();
+      updateAIStatus();
+    });
+  });
+
+  // 主开关
+  toggle.addEventListener('click', () => {
+    aiEnabled = !aiEnabled;
+    toggle.classList.toggle('on', aiEnabled);
+    providerTabs.style.display = aiEnabled ? 'flex' : 'none';
+    syncKeyUI();
+
+    if (!aiEnabled) {
+      status.textContent = '';
+      status.className = 'ai-status';
+    } else {
+      updateAIStatus();
+      if (aiProvider === 'local' && !localEngine) {
+        preloadLocalModel();
+      }
+    }
+  });
+
+  // 保存 Key
+  saveBtn.addEventListener('click', () => {
+    const key = keyInput.value.trim();
+    if (!key) {
+      status.textContent = '⚠️ 请输入有效的 API Key';
+      status.className = 'ai-status err';
+      return;
+    }
+    if (aiProvider === 'dashscope') {
+      dashscopeApiKey = key;
+      localStorage.setItem('xinjing_ds_key', key);
+    } else if (aiProvider === 'deepseek') {
+      deepseekApiKey = key;
+      localStorage.setItem('xinjing_ds2_key', key);
+    } else if (aiProvider === 'gemini') {
+      geminiApiKey = key;
+      localStorage.setItem('xinjing_gm_key', key);
+    } else if (aiProvider === 'custom') {
+      customApiKey = key;
+      customApiUrl = customUrlInput.value.trim();
+      customApiModel = customModelInput.value.trim() || 'gpt-4o-mini';
+      localStorage.setItem('xinjing_cu_key', key);
+      localStorage.setItem('xinjing_cu_url', customApiUrl);
+      localStorage.setItem('xinjing_cu_model', customApiModel);
+    }
+    updateAIStatus();
+  });
+
+  // 预下载按钮
+  preloadBtn.addEventListener('click', () => {
+    preloadBtn.disabled = true;
+    preloadBtn.textContent = '⏳ 正在下载...';
+    preloadLocalModel().finally(() => {
+      preloadBtn.disabled = false;
+      preloadBtn.style.display = localEngine ? 'none' : 'block';
+    });
+  });
+
+  // 初始同步
+  syncKeyUI();
+}
+
+function updateAIStatus() {
+  const status = document.getElementById('aiStatus');
+  if (aiProvider === 'dashscope') {
+    if (dashscopeApiKey) {
+      status.textContent = '✅ 阿里百炼 API Key 已就绪（每月免费 200 万 tokens）';
+      status.className = 'ai-status ok';
+    } else {
+      status.textContent = '🔑 请注册阿里百炼并填入 API Key（每月免费 200 万 tokens）';
+      status.className = 'ai-status err';
+    }
+  } else if (aiProvider === 'deepseek') {
+    if (deepseekApiKey) {
+      status.textContent = '✅ DeepSeek API Key 已就绪（国内直连，极速响应）';
+      status.className = 'ai-status ok';
+    } else {
+      status.textContent = '🔑 请注册 DeepSeek 并填入 API Key（免费额度）';
+      status.className = 'ai-status err';
+    }
+  } else if (aiProvider === 'local') {
+    if (localEngine) {
+      status.textContent = '✅ 本地模型已就绪（首次需下载约 1.5GB）';
+      status.className = 'ai-status ok';
+    } else {
+      status.textContent = '💡 首次点击"分析"时将自动下载模型（约 1.5GB，仅一次）';
+      status.className = 'ai-status ok';
+    }
+  } else if (aiProvider === 'gemini') {
+    if (geminiApiKey) {
+      status.textContent = '✅ Gemini API Key 已就绪';
+      status.className = 'ai-status ok';
+    } else {
+      status.textContent = '⚠️ 请先输入 Gemini API Key';
+      status.className = 'ai-status err';
+    }
+  } else if (aiProvider === 'custom') {
+    if (customApiUrl) {
+      status.textContent = `✅ 自定义 API 已配置（${customApiModel}）`;
+      status.className = 'ai-status ok';
+    } else {
+      status.textContent = '🔑 请填写自定义 API 地址和 Key';
+      status.className = 'ai-status err';
+    }
+  }
+}
+
+// 预加载本地模型
+async function preloadLocalModel() {
+  const status = document.getElementById('aiStatus');
+  const loadingBar = document.getElementById('aiLoadingBar');
+  try {
+    status.textContent = '⏳ 检查 SDK 与 WebGPU...';
+    status.className = 'ai-status';
+    loadingBar.classList.add('show');
+
+    const wllm = window.webllm;
+    if (!wllm) throw new Error('WebLLM SDK 未加载——CDN 可能被拦截，请刷新重试或使用 DeepSeek');
+
+    // 检查 WebGPU 支持
+    if (!navigator.gpu) throw new Error('当前浏览器不支持 WebGPU，请使用 Chrome 113+ 或 Edge 113+');
+    console.log('[WebLLM] WebGPU 可用，开始加载模型:', LOCAL_MODEL);
+
+    status.textContent = '⏳ 正在下载模型... 0%（约 1.5GB，首次需等待）';
+    let lastPct = 0;
+    localEngine = await wllm.CreateMLCEngine(LOCAL_MODEL, {
+      appConfig: {
+        model_list: [{ model_id: LOCAL_MODEL, model_url: MODEL_BASE_URL }],
+      },
+      initProgressCallback: (p) => {
+        const pct = Math.round(p.progress * 100);
+        if (pct !== lastPct) {
+          lastPct = pct;
+          console.log(`[WebLLM] 下载进度: ${pct}%`);
+          status.textContent = `⏳ 正在下载模型... ${pct}%（约 1.5GB）`;
+        }
+      },
+    });
+
+    loadingBar.classList.remove('show');
+    status.textContent = '✅ 本地模型已就绪，可以开始分析了！';
+    status.className = 'ai-status ok';
+    console.log('[WebLLM] 模型加载完成');
+  } catch (err) {
+    loadingBar.classList.remove('show');
+    console.error('[WebLLM] 失败:', err.message);
+    status.textContent = `❌ ${err.message}`;
+    status.className = 'ai-status err';
+    localEngine = null;
+  }
+}
+
+// 确保本地模型已加载
+async function ensureLocalModel() {
+  if (localEngine) return;
+  const wllm = window.webllm;
+  if (!wllm) throw new Error('WebLLM SDK 未加载，请刷新页面重试');
+
+  const status = document.getElementById('aiStatus');
+  const loadingBar = document.getElementById('aiLoadingBar');
+  status.textContent = '⏳ 正在加载本地模型...（首次需下载，后续秒开）';
+  status.className = 'ai-status';
+  loadingBar.classList.add('show');
+
+  localEngine = await wllm.CreateMLCEngine(LOCAL_MODEL, {
+    appConfig: {
+      model_list: [{ model_id: LOCAL_MODEL, model_url: MODEL_BASE_URL }],
+    },
+    initProgressCallback: (p) => {
+      const pct = Math.round(p.progress * 100);
+      status.textContent = `⏳ 正在加载模型... ${pct}%`;
+    },
+  });
+
+  loadingBar.classList.remove('show');
+  status.textContent = '✅ 本地模型已就绪';
+  status.className = 'ai-status ok';
+}
+
+// 调用 AI（自动选择 provider）
+async function callAI(prompt) {
+  if (aiProvider === 'dashscope') {
+    return await callDashscope(prompt);
+  } else if (aiProvider === 'deepseek') {
+    return await callDeepSeek(prompt);
+  } else if (aiProvider === 'gemini') {
+    return await callGemini(prompt);
+  } else if (aiProvider === 'custom') {
+    return await callCustom(prompt);
+  } else {
+    return await callLocalAI(prompt);
+  }
+}
+
+// 调用自定义 OpenAI 兼容 API
+async function callCustom(prompt) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (customApiKey) headers['Authorization'] = `Bearer ${customApiKey}`;
+  const resp = await fetch(customApiUrl, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      model: customApiModel,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.8,
+      max_tokens: 800,
+    }),
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.error?.message || `自定义 API 请求失败 (${resp.status})`);
+  }
+  const data = await resp.json();
+  return data.choices?.[0]?.message?.content || '';
+}
+
+// 调用阿里百炼 API（每月免费 200 万 tokens，国内直连）
+async function callDashscope(prompt) {
+  const resp = await fetch('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${dashscopeApiKey}`,
+    },
+    body: JSON.stringify({
+      model: 'qwen-turbo',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.8,
+      max_tokens: 800,
+    }),
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.message || err.error?.message || `百炼请求失败 (${resp.status})`);
+  }
+  const data = await resp.json();
+  return data.choices?.[0]?.message?.content || '';
+}
+
+// 调用 DeepSeek API（国内直连，兼容 OpenAI 格式）
+async function callDeepSeek(prompt) {
+  const resp = await fetch('https://api.deepseek.com/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${deepseekApiKey}`,
+    },
+    body: JSON.stringify({
+      model: 'deepseek-chat',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.8,
+      max_tokens: 800,
+    }),
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.error?.message || `DeepSeek 请求失败 (${resp.status})`);
+  }
+  const data = await resp.json();
+  return data.choices?.[0]?.message?.content || '';
+}
+
+// 调用本地模型
+async function callLocalAI(prompt) {
+  await ensureLocalModel();
+  const reply = await localEngine.chat.completions.create({
+    messages: [{ role: 'user', content: prompt }],
+    temperature: 0.8,
+    max_tokens: 600,
+  });
+  return reply.choices[0].message.content || '';
+}
+
+// 调用 Gemini API
+async function callGemini(prompt) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`;
+  const body = {
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: { temperature: 0.8, maxOutputTokens: 800 },
+  };
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.error?.message || `请求失败 (${resp.status})`);
+  }
+  const data = await resp.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+}
+
+// 构建 AI 提示词
+function buildAIPrompt(text, emotions, contexts) {
+  const emotionLabels = emotions.map(k => {
+    const found = EMOTIONS.find(e => e.key === k);
+    return found ? `${found.emoji}${found.label}` : k;
+  }).join('、') || '未标注';
+
+  const contextLabels = contexts.map(k =>
+    CONTEXT_KEYWORD_MAP[k]?.label || k
+  ).join('、');
+
+  return `你是一位温柔且犀利的情绪辅导专家，专长于 CPTSD 和 ADHD 支持。请严格根据用户今天写的具体内容，给出高度个性化的回应。不要泛泛而谈，必须引用用户提到的名字、事件、地点、细节。
+
+用户当前情绪：${emotionLabels}
+涉及场景：${contextLabels || '通用'}
+用户随记内容：
+"""
+${text}
+"""
+
+重要——请按以下三段式输出，每段前用【标签】开头：
+
+【显化肯定语】
+用第一人称写 2-3 句显化肯定语。必须提到用户随记中的具体细节（人名、事件、物品等），让用户感到"这是专门给我的"。语气温柔坚定。
+
+【情绪安抚】
+针对用户所述的具体困扰，给 2-3 句共情安抚。不要泛泛安慰，要直接回应用户提到的情绪点。避免空洞的正能量。
+
+【微小行动方案】
+给 2 条立即可做的小行动，必须适配用户的具体场景。每条一句话，不评判，极低压。`;
+}
+
+// ---- 保存到 localStorage ----
+function handleSave() {
+  const text = document.getElementById('journalInput').value.trim();
+  const emotions = [...selectedEmotions];
+
+  if (!text && emotions.length === 0) {
+    showToast('写下点什么吧，哪怕一个词也好 🤍');
+    return;
+  }
+
+  const entry = {
+    id: Date.now(),
+    time: new Date().toISOString(),
+    text: text,
+    emotions: emotions,
+  };
+
+  const history = getHistory();
+  history.unshift(entry);
+  localStorage.setItem('xinjing_journal', JSON.stringify(history));
+
+  showToast('已为您收藏这段时光 🤍');
+}
+
+function showToast(msg) {
+  const toast = document.getElementById('saveToast');
+  toast.textContent = msg;
+  toast.classList.remove('show');
+  void toast.offsetWidth;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+function getHistory() {
+  try {
+    return JSON.parse(localStorage.getItem('xinjing_journal') || '[]');
+  } catch {
+    return [];
+  }
+}
+
+// ---- 导出/导入备份 ----
+function exportBackup() {
+  const history = getHistory();
+  if (history.length === 0) {
+    showToast('还没有保存的随记，先写一篇吧 🤍');
+    return;
+  }
+  const backup = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    entries: history,
+  };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `心镜随记_备份_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast(`已导出 ${history.length} 条随记到下载文件夹 ✅`);
+}
+
+function importBackup(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (!data.entries || !Array.isArray(data.entries)) {
+        throw new Error('格式不正确');
+      }
+      const existing = getHistory();
+      const existingIds = new Set(existing.map(e => e.id));
+      let imported = 0;
+      data.entries.forEach(entry => {
+        if (!existingIds.has(entry.id)) {
+          existing.push(entry);
+          imported++;
+        }
+      });
+      existing.sort((a, b) => b.id - a.id);
+      localStorage.setItem('xinjing_journal', JSON.stringify(existing));
+      showToast(`已导入 ${imported} 条随记（跳过 ${data.entries.length - imported} 条重复）✅`);
+    } catch (err) {
+      showToast(`❌ 导入失败：${err.message}`);
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = ''; // 允许重复选同一个文件
+}
+
+// ---- 历史模态框 ----
+function initModal() {
+  document.getElementById('modalClose').addEventListener('click', closeModal);
+  document.getElementById('modalOverlay').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeModal();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeModal();
+  });
+}
+
+function openModal() {
+  const overlay = document.getElementById('modalOverlay');
+  const list = document.getElementById('historyList');
+  const history = getHistory();
+
+  if (history.length === 0) {
+    list.innerHTML = '<div class="history-empty">🌙 还没有保存的随记呢<br>写下今天的第一篇吧</div>';
+  } else {
+    list.innerHTML = history.map(entry => {
+      const d = new Date(entry.time);
+      const timeStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+      const emotionLabels = entry.emotions.map(k => {
+        const found = EMOTIONS.find(e => e.key === k);
+        return found ? `${found.emoji}${found.label}` : k;
+      }).join(' ');
+      const preview = entry.text ? entry.text.slice(0, 50) + (entry.text.length > 50 ? '...' : '') : '（无文字内容）';
+      return `
+        <div class="history-item" data-id="${entry.id}">
+          <div class="hi-time">${timeStr}</div>
+          <div class="hi-emotions">${emotionLabels || '（未标记情绪）'}</div>
+          <div class="hi-preview">${escapeHtml(preview)}</div>
+          <div class="history-actions">
+            <button class="btn-sm load-btn" data-id="${entry.id}">📋 加载</button>
+            <button class="btn-sm danger del-btn" data-id="${entry.id}">🗑 删除</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  overlay.classList.add('open');
+
+  // 绑定加载和删除事件
+  list.querySelectorAll('.load-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      loadEntry(Number(btn.dataset.id));
+    });
+  });
+  list.querySelectorAll('.del-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteEntry(Number(btn.dataset.id));
+    });
+  });
+  list.querySelectorAll('.history-item').forEach(item => {
+    item.addEventListener('click', () => loadEntry(Number(item.dataset.id)));
+  });
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+}
+
+function loadEntry(id) {
+  const history = getHistory();
+  const entry = history.find(e => e.id === id);
+  if (!entry) return;
+
+  document.getElementById('journalInput').value = entry.text || '';
+  document.getElementById('journalInput').dispatchEvent(new Event('input'));
+
+  // 重置情绪选择
+  selectedEmotions = [];
+  document.querySelectorAll('.emotion-btn').forEach(b => b.classList.remove('active'));
+  if (entry.emotions) {
+    entry.emotions.forEach(key => {
+      const btn = document.querySelector(`.emotion-btn[data-key="${key}"]`);
+      if (btn) {
+        btn.classList.add('active');
+        selectedEmotions.push(key);
+      }
+    });
+  }
+
+  closeModal();
+  document.getElementById('journalInput').focus();
+  // 滚动到输入区
+  document.querySelector('.card').scrollIntoView({ behavior: 'smooth' });
+}
+
+function deleteEntry(id) {
+  if (!confirm('确定要删除这条随记吗？这个操作不可撤销。')) return;
+
+  let history = getHistory();
+  history = history.filter(e => e.id !== id);
+  localStorage.setItem('xinjing_journal', JSON.stringify(history));
+  openModal(); // 刷新列表
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+</script>
+</body>
+</html>
