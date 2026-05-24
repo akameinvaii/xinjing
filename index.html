@@ -4,25 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>心镜随记 · 显化情绪辅导助手</title>
-<script type="module">
-// WebLLM: 浏览器本地 AI（无需登录、无需 API Key）
-(async () => {
-  try {
-    const mod = await import("https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.68/+esm");
-    window.webllm = mod;
-    console.log("[WebLLM] SDK 已加载", Object.keys(mod));
-  } catch (e) {
-    console.warn("[WebLLM] jsdelivr 加载失败，尝试备用 CDN:", e.message);
-    try {
-      const mod = await import("https://esm.sh/@mlc-ai/web-llm@0.2.68");
-      window.webllm = mod;
-      console.log("[WebLLM] SDK 已加载 (esm.sh)");
-    } catch (e2) {
-      console.error("[WebLLM] SDK 加载完全失败:", e2.message);
-    }
-  }
-})();
-</script>
+
 <style>
 /* ===== CSS Variables & Reset ===== */
 :root {
@@ -539,26 +521,6 @@ body {
 .ai-provider-tab:hover {
   border-color: var(--purple);
 }
-.ai-loading-bar {
-  display: none;
-  height: 4px;
-  background: var(--border);
-  border-radius: 2px;
-  margin-top: 8px;
-  overflow: hidden;
-}
-.ai-loading-bar.show { display: block; }
-.ai-loading-bar .fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--purple), var(--pink));
-  border-radius: 2px;
-  animation: loadingBar 1.5s ease-in-out infinite;
-  width: 30%;
-}
-@keyframes loadingBar {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(400%); }
-}
 
 /* ===== Context badge in response ===== */
 .context-badge {
@@ -620,27 +582,18 @@ body {
         <div class="toggle-switch" id="aiToggle" title="开启后使用 AI 生成个性化回应"></div>
       </div>
       <div class="ai-provider-tabs" id="aiProviderTabs" style="display:none;">
-          <button class="ai-provider-tab active" data-provider="dashscope">🪷 阿里百炼（免费）</button>
-          <button class="ai-provider-tab" data-provider="deepseek">🔥 DeepSeek</button>
-          <button class="ai-provider-tab" data-provider="local">💻 浏览器本地</button>
-          <button class="ai-provider-tab" data-provider="gemini">☁️ Gemini</button>
-          <button class="ai-provider-tab" data-provider="custom">🔌 自定义 API</button>
-        </div>
+        <button class="ai-provider-tab active" data-provider="dashscope">🪷 阿里百炼（免费）</button>
+        <button class="ai-provider-tab" data-provider="deepseek">🔥 DeepSeek</button>
+      </div>
+      
       <div class="ai-key-row" id="aiKeyRow">
-        <input class="ai-key-input" id="aiKeyInput" type="password" placeholder="" />
+        <input class="ai-key-input" id="aiKeyInput" type="password" placeholder="输入阿里百炼 API Key（每月免费 200 万 tokens）" />
         <button class="btn-sm" id="btnSaveKey" style="flex-shrink:0;">保存</button>
       </div>
-      <div class="ai-key-row" id="aiCustomUrlRow" style="display:none;">
-        <input class="ai-key-input" id="aiCustomUrl" type="text" placeholder="API 地址，如 https://api.openai.com/v1/chat/completions" />
-      </div>
-      <div class="ai-key-row" id="aiCustomModelRow" style="display:none;">
-        <input class="ai-key-input" id="aiCustomModel" type="text" placeholder="模型名，如 gpt-4o-mini" />
-      </div>
       <div class="ai-key-hint" id="aiKeyHint">
+        免费获取 Key：<a href="https://bailian.console.aliyun.com/?apiKey=1" target="_blank">阿里百炼控制台</a>（实名后每月免费 200 万 tokens，国内直连）
       </div>
-      <div class="ai-loading-bar" id="aiLoadingBar"><div class="fill"></div></div>
       <div class="ai-status" id="aiStatus"></div>
-      <button class="btn-sm" id="btnPreload" style="display:none;margin-top:6px;width:100%;">⬇️ 预下载本地模型（约 1.5GB，下载后无需联网）</button>
     </div>
 
     <div class="actions">
@@ -704,6 +657,7 @@ const EMOTIONS = [
   { emoji: '😶', label: '麻木/解离', key: 'numb' },
   { emoji: '🥹', label: '委屈', key: 'hurt' },
   { emoji: '😤', label: '挫败', key: 'frustrated' },
+  { emoji: '😄', label: '开心', key: 'happy' },
   { emoji: '🌈', label: '感恩', key: 'grateful' },
   { emoji: '✨', label: '平静', key: 'calm' },
 ];
@@ -722,8 +676,10 @@ const KEYWORD_EMOTION_MAP = {
   hurt: ['委屈','冤枉','不公平','被误解','被忽视','被冷落','受伤','心碎','不被理解','被伤害','难过','哭','为什么','偏心','不公','凭什么'],
   // 挫败
   frustrated: ['挫败','失败','做不到','不行','太差','废物','无能','搞砸','犯错','错误','后悔','自责','内疚','不够好','比不上','落后','放弃','颓废','无能'],
+  // 开心
+  happy: ['开心','快乐','高兴','愉快','喜悦','兴奋','嗨','爽','美滋滋','棒','太棒了','好开心','幸福'],
   // 感恩
-  grateful: ['感恩','感谢','感激','幸运','美好','幸福','温暖','珍惜','满足','小确幸','阳光','开心','快乐','美好'],
+  grateful: ['感恩','感谢','感激','幸运','美好','温暖','珍惜','满足','小确幸','阳光','美好'],
   // 平静
   calm: ['平静','安宁','安心','放松','舒适','惬意','稳定','安稳','平和','宁静','踏实'],
   // 扩展情绪
@@ -772,6 +728,11 @@ const AFFIRMATION_TEMPLATES = {
     '我已经拥有如此多的丰盛。每一次感恩都在扩大我内心的光，而我允许这份光遍布我的整个存在。',
     '此刻我沉浸在圆满之中。感恩不是寻找美好，而是认出美好早已在我身边。我活在丰盛之中。',
     '我正在被无数微小而确切的幸福包围。每一次呼吸都是礼物，每一个当下都是馈赠。',
+  ],
+  happy: [
+    '此刻的我完全沉浸在喜悦之中。这份开心是被我深深认领的，我值得拥有一切美好的感受。我允许自己在快乐中自由地绽放，不需要任何理由。',
+    '我允许自己尽情地笑、无忧无虑地快乐。这份轻盈是我灵魂本来的样子，我正在回到最真实、最自由的自己。',
+    '每一次感到开心，都是宇宙在回应我内在的光。我看见自己的快乐，我庆祝自己的快乐，而这份快乐在吸引更多美好进入我的生命。',
   ],
   calm: [
     '我已经抵达了内心的宁静之地。这份平静是我与生俱来的底色，无论外界如何变化，我都能回归到这份安宁之中。',
@@ -837,6 +798,11 @@ const ACTION_TEMPLATES = {
     '在脑中或纸上列出今天 3 件让你感到微小温暖的事。不需要"大事"，阳光照在脸上也算。',
     '给一个你在意的人发一条简短的消息，只说一句感谢或想念。不求回复，只是把温暖传递出去。',
     '坐下闭上眼睛，回忆一个让你微笑的瞬间。在脑海中把这个画面放大、加上色彩、延长几秒。',
+  ],
+  happy: [
+    '拿出手机或纸笔，记录下此刻让你开心的 3 个瞬间。用具体的词描述它："阳光洒在桌上""吃到了一口很甜的西瓜"。收藏这份开心。',
+    '放一首你最爱的、让你想跟着晃动的歌。站起来，哪怕只是轻轻摇摆 30 秒——让身体参与这份喜悦。',
+    '对着镜子里对自己微笑一下。不是强颜欢笑，而是认领这份："嘿，你今天的心情真好。"然后抱抱自己。',
   ],
   calm: [
     '享受这一刻的平静。闭上眼，感受 3 次完整的呼吸，在心里对自己说："这一切都刚刚好。"',
@@ -1048,27 +1014,23 @@ async function handleAnalyze() {
 
   // AI 模式
   if (aiEnabled && text) {
-    // 检查 provider 是否可用
-    const needsKey = (aiProvider === 'dashscope' || aiProvider === 'deepseek' || aiProvider === 'gemini' || aiProvider === 'custom');
-    const hasKey = aiProvider === 'dashscope' ? !!dashscopeApiKey : aiProvider === 'deepseek' ? !!deepseekApiKey : aiProvider === 'gemini' ? !!geminiApiKey : aiProvider === 'custom' ? !!customApiUrl : false;
-    if (needsKey && !hasKey) {
-      const name = aiProvider === 'dashscope' ? '阿里百炼' : aiProvider === 'deepseek' ? 'DeepSeek' : aiProvider === 'gemini' ? 'Gemini' : '自定义 API';
+    const needsKey = aiProvider === 'dashscope' ? !dashscopeApiKey : !deepseekApiKey;
+    if (needsKey) {
+      const name = aiProvider === 'dashscope' ? '阿里百炼' : 'DeepSeek';
       responseCard.innerHTML = `
         <div class="response-module module-affirmation" style="margin-bottom:12px;">
           <div class="module-header"><span class="module-icon">⚠️</span> ${name} 未配置 API Key</div>
-          <div class="module-body" style="color:var(--pink);">请填入 ${name} API Key，或切换到其他 AI 模式。</div>
+          <div class="module-body" style="color:var(--pink);">请填入 ${name} API Key 后使用 AI 功能。</div>
         </div>`;
       showResponse(responseArea);
       return;
     }
 
-    const providerLabels = { dashscope: '阿里百炼', deepseek: 'DeepSeek', local: '本地模型', gemini: 'Gemini' };
-    const providerLabel = providerLabels[aiProvider] || 'AI';
-    const providerHint = aiProvider === 'local' ? '首次使用需下载模型（约 1.5GB），后续将秒开...' : `正在连接 ${providerLabel}...`;
+    const providerLabel = aiProvider === 'dashscope' ? '阿里百炼' : 'DeepSeek';
     responseCard.innerHTML = `
       <div class="response-module module-affirmation">
         <div class="module-header"><span class="module-icon">🤖</span> AI 正在分析（${providerLabel}）...</div>
-        <div class="module-body" style="color:var(--text-muted);">${providerHint}</div>
+        <div class="module-body" style="color:var(--text-muted);">正在连接 ${providerLabel}...</div>
       </div>`;
     showResponse(responseArea);
 
@@ -1296,21 +1258,11 @@ function extractContext(text) {
   return sorted.slice(0, 2).map(([key]) => key);
 }
 
-// ---- AI 增强：三引擎（DeepSeek / 浏览器本地 / Gemini） ----
+// ---- AI 增强：阿里百炼 + DeepSeek ----
 let aiEnabled = false;
-let aiProvider = 'dashscope';   // 'dashscope' | 'deepseek' | 'local' | 'gemini'
-let geminiApiKey = '';
-let deepseekApiKey = '';
+let aiProvider = 'dashscope';   // 'dashscope' | 'deepseek'
 let dashscopeApiKey = '';
-let customApiKey = '';
-let customApiUrl = '';
-let customApiModel = 'gpt-4o-mini';
-let localEngine = null;
-
-// 支持的本地模型（按大小排序，优先用小模型）
-const LOCAL_MODEL = 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC'; // ~1.5GB，中文友好
-// ModelScope 国内直链（HuggingFace 被墙，ModelScope 稳定且支持 CORS）
-const MODEL_BASE_URL = 'https://modelscope.cn/models/mlc-ai/Qwen2.5-1.5B-Instruct-q4f16_1-MLC/resolve/master/';
+let deepseekApiKey = '';
 
 // 初始化 AI 设置
 function initAI() {
@@ -1321,60 +1273,46 @@ function initAI() {
   const saveBtn = document.getElementById('btnSaveKey');
   const status = document.getElementById('aiStatus');
   const providerTabs = document.getElementById('aiProviderTabs');
-  const loadingBar = document.getElementById('aiLoadingBar');
-  const preloadBtn = document.getElementById('btnPreload');
 
   // 恢复保存的 Key
   const savedDashScope = localStorage.getItem('xinjing_ds_key');
   if (savedDashScope) dashscopeApiKey = savedDashScope;
   const savedDeepSeek = localStorage.getItem('xinjing_ds2_key');
   if (savedDeepSeek) deepseekApiKey = savedDeepSeek;
-  const savedGemini = localStorage.getItem('xinjing_gm_key');
-  if (savedGemini) geminiApiKey = savedGemini;
-  const savedCustomKey = localStorage.getItem('xinjing_cu_key');
-  if (savedCustomKey) customApiKey = savedCustomKey;
-  const savedCustomUrl = localStorage.getItem('xinjing_cu_url');
-  if (savedCustomUrl) customApiUrl = savedCustomUrl;
-  const savedCustomModel = localStorage.getItem('xinjing_cu_model');
-  if (savedCustomModel) customApiModel = savedCustomModel;
 
   // 恢复 provider 偏好
   const savedProvider = localStorage.getItem('xinjing_ai_provider');
   if (savedProvider) aiProvider = savedProvider;
 
-  const customUrlRow = document.getElementById('aiCustomUrlRow');
-  const customModelRow = document.getElementById('aiCustomModelRow');
-  const customUrlInput = document.getElementById('aiCustomUrl');
-  const customModelInput = document.getElementById('aiCustomModel');
-
-  // 根据 provider 显示对应的 key
   function syncKeyUI() {
-    const needsKey = aiProvider === 'dashscope' || aiProvider === 'deepseek' || aiProvider === 'gemini' || aiProvider === 'custom';
-    keyRow.classList.toggle('show', aiEnabled && needsKey);
-    keyHint.classList.toggle('show', aiEnabled && needsKey);
-    preloadBtn.style.display = (aiEnabled && aiProvider === 'local') ? 'block' : 'none';
-    const isCustom = aiEnabled && aiProvider === 'custom';
-    customUrlRow.style.display = isCustom ? 'flex' : 'none';
-    customModelRow.style.display = isCustom ? 'flex' : 'none';
-
     if (aiProvider === 'dashscope') {
       keyInput.placeholder = '输入阿里百炼 API Key（每月免费 200 万 tokens）';
       keyInput.value = dashscopeApiKey || '';
       keyHint.innerHTML = '免费获取 Key：<a href="https://bailian.console.aliyun.com/?apiKey=1" target="_blank">阿里百炼控制台</a>（实名后每月免费 200 万 tokens，国内直连）';
-    } else if (aiProvider === 'deepseek') {
+    } else {
       keyInput.placeholder = '输入 DeepSeek API Key（注册即送免费额度）';
       keyInput.value = deepseekApiKey || '';
       keyHint.innerHTML = '免费获取 Key：<a href="https://platform.deepseek.com/api_keys" target="_blank">DeepSeek 开放平台</a>（注册即送 10 元额度，国内直连）';
-    } else if (aiProvider === 'gemini') {
-      keyInput.placeholder = '输入 Gemini API Key';
-      keyInput.value = geminiApiKey || '';
-      keyHint.innerHTML = '免费获取 Key：<a href="https://aistudio.google.com/apikey" target="_blank">Google AI Studio</a>（需科学上网，每分钟 15 次免费）';
-    } else if (aiProvider === 'custom') {
-      keyInput.placeholder = '输入 API Key（可选，如不需要可留空）';
-      keyInput.value = customApiKey || '';
-      customUrlInput.value = customApiUrl || '';
-      customModelInput.value = customApiModel || '';
-      keyHint.innerHTML = '支持任意兼容 OpenAI Chat Completions 格式的 API（如 Ollama、硅基流动、OpenRouter 等）';
+    }
+  }
+
+  function updateAIStatus() {
+    if (aiProvider === 'dashscope') {
+      if (dashscopeApiKey) {
+        status.textContent = '✅ 阿里百炼 API Key 已就绪（每月免费 200 万 tokens）';
+        status.className = 'ai-status ok';
+      } else {
+        status.textContent = '🔑 请注册阿里百炼并填入 API Key（每月免费 200 万 tokens）';
+        status.className = 'ai-status err';
+      }
+    } else {
+      if (deepseekApiKey) {
+        status.textContent = '✅ DeepSeek API Key 已就绪（国内直连，极速响应）';
+        status.className = 'ai-status ok';
+      } else {
+        status.textContent = '🔑 请注册 DeepSeek 并填入 API Key（免费额度）';
+        status.className = 'ai-status err';
+      }
     }
   }
 
@@ -1396,16 +1334,13 @@ function initAI() {
     aiEnabled = !aiEnabled;
     toggle.classList.toggle('on', aiEnabled);
     providerTabs.style.display = aiEnabled ? 'flex' : 'none';
-    syncKeyUI();
-
+    keyRow.classList.toggle('show', aiEnabled);
+    keyHint.classList.toggle('show', aiEnabled);
     if (!aiEnabled) {
       status.textContent = '';
       status.className = 'ai-status';
     } else {
       updateAIStatus();
-      if (aiProvider === 'local' && !localEngine) {
-        preloadLocalModel();
-      }
     }
   });
 
@@ -1420,189 +1355,15 @@ function initAI() {
     if (aiProvider === 'dashscope') {
       dashscopeApiKey = key;
       localStorage.setItem('xinjing_ds_key', key);
-    } else if (aiProvider === 'deepseek') {
+    } else {
       deepseekApiKey = key;
       localStorage.setItem('xinjing_ds2_key', key);
-    } else if (aiProvider === 'gemini') {
-      geminiApiKey = key;
-      localStorage.setItem('xinjing_gm_key', key);
-    } else if (aiProvider === 'custom') {
-      customApiKey = key;
-      customApiUrl = customUrlInput.value.trim();
-      customApiModel = customModelInput.value.trim() || 'gpt-4o-mini';
-      localStorage.setItem('xinjing_cu_key', key);
-      localStorage.setItem('xinjing_cu_url', customApiUrl);
-      localStorage.setItem('xinjing_cu_model', customApiModel);
     }
     updateAIStatus();
   });
 
-  // 预下载按钮
-  preloadBtn.addEventListener('click', () => {
-    preloadBtn.disabled = true;
-    preloadBtn.textContent = '⏳ 正在下载...';
-    preloadLocalModel().finally(() => {
-      preloadBtn.disabled = false;
-      preloadBtn.style.display = localEngine ? 'none' : 'block';
-    });
-  });
-
-  // 初始同步
   syncKeyUI();
-}
-
-function updateAIStatus() {
-  const status = document.getElementById('aiStatus');
-  if (aiProvider === 'dashscope') {
-    if (dashscopeApiKey) {
-      status.textContent = '✅ 阿里百炼 API Key 已就绪（每月免费 200 万 tokens）';
-      status.className = 'ai-status ok';
-    } else {
-      status.textContent = '🔑 请注册阿里百炼并填入 API Key（每月免费 200 万 tokens）';
-      status.className = 'ai-status err';
-    }
-  } else if (aiProvider === 'deepseek') {
-    if (deepseekApiKey) {
-      status.textContent = '✅ DeepSeek API Key 已就绪（国内直连，极速响应）';
-      status.className = 'ai-status ok';
-    } else {
-      status.textContent = '🔑 请注册 DeepSeek 并填入 API Key（免费额度）';
-      status.className = 'ai-status err';
-    }
-  } else if (aiProvider === 'local') {
-    if (localEngine) {
-      status.textContent = '✅ 本地模型已就绪（首次需下载约 1.5GB）';
-      status.className = 'ai-status ok';
-    } else {
-      status.textContent = '💡 首次点击"分析"时将自动下载模型（约 1.5GB，仅一次）';
-      status.className = 'ai-status ok';
-    }
-  } else if (aiProvider === 'gemini') {
-    if (geminiApiKey) {
-      status.textContent = '✅ Gemini API Key 已就绪';
-      status.className = 'ai-status ok';
-    } else {
-      status.textContent = '⚠️ 请先输入 Gemini API Key';
-      status.className = 'ai-status err';
-    }
-  } else if (aiProvider === 'custom') {
-    if (customApiUrl) {
-      status.textContent = `✅ 自定义 API 已配置（${customApiModel}）`;
-      status.className = 'ai-status ok';
-    } else {
-      status.textContent = '🔑 请填写自定义 API 地址和 Key';
-      status.className = 'ai-status err';
-    }
-  }
-}
-
-// 预加载本地模型
-async function preloadLocalModel() {
-  const status = document.getElementById('aiStatus');
-  const loadingBar = document.getElementById('aiLoadingBar');
-  try {
-    status.textContent = '⏳ 检查 SDK 与 WebGPU...';
-    status.className = 'ai-status';
-    loadingBar.classList.add('show');
-
-    const wllm = window.webllm;
-    if (!wllm) throw new Error('WebLLM SDK 未加载——CDN 可能被拦截，请刷新重试或使用 DeepSeek');
-
-    // 检查 WebGPU 支持
-    if (!navigator.gpu) throw new Error('当前浏览器不支持 WebGPU，请使用 Chrome 113+ 或 Edge 113+');
-    console.log('[WebLLM] WebGPU 可用，开始加载模型:', LOCAL_MODEL);
-
-    status.textContent = '⏳ 正在下载模型... 0%（约 1.5GB，首次需等待）';
-    let lastPct = 0;
-    localEngine = await wllm.CreateMLCEngine(LOCAL_MODEL, {
-      appConfig: {
-        model_list: [{ model_id: LOCAL_MODEL, model_url: MODEL_BASE_URL }],
-      },
-      initProgressCallback: (p) => {
-        const pct = Math.round(p.progress * 100);
-        if (pct !== lastPct) {
-          lastPct = pct;
-          console.log(`[WebLLM] 下载进度: ${pct}%`);
-          status.textContent = `⏳ 正在下载模型... ${pct}%（约 1.5GB）`;
-        }
-      },
-    });
-
-    loadingBar.classList.remove('show');
-    status.textContent = '✅ 本地模型已就绪，可以开始分析了！';
-    status.className = 'ai-status ok';
-    console.log('[WebLLM] 模型加载完成');
-  } catch (err) {
-    loadingBar.classList.remove('show');
-    console.error('[WebLLM] 失败:', err.message);
-    status.textContent = `❌ ${err.message}`;
-    status.className = 'ai-status err';
-    localEngine = null;
-  }
-}
-
-// 确保本地模型已加载
-async function ensureLocalModel() {
-  if (localEngine) return;
-  const wllm = window.webllm;
-  if (!wllm) throw new Error('WebLLM SDK 未加载，请刷新页面重试');
-
-  const status = document.getElementById('aiStatus');
-  const loadingBar = document.getElementById('aiLoadingBar');
-  status.textContent = '⏳ 正在加载本地模型...（首次需下载，后续秒开）';
-  status.className = 'ai-status';
-  loadingBar.classList.add('show');
-
-  localEngine = await wllm.CreateMLCEngine(LOCAL_MODEL, {
-    appConfig: {
-      model_list: [{ model_id: LOCAL_MODEL, model_url: MODEL_BASE_URL }],
-    },
-    initProgressCallback: (p) => {
-      const pct = Math.round(p.progress * 100);
-      status.textContent = `⏳ 正在加载模型... ${pct}%`;
-    },
-  });
-
-  loadingBar.classList.remove('show');
-  status.textContent = '✅ 本地模型已就绪';
-  status.className = 'ai-status ok';
-}
-
-// 调用 AI（自动选择 provider）
-async function callAI(prompt) {
-  if (aiProvider === 'dashscope') {
-    return await callDashscope(prompt);
-  } else if (aiProvider === 'deepseek') {
-    return await callDeepSeek(prompt);
-  } else if (aiProvider === 'gemini') {
-    return await callGemini(prompt);
-  } else if (aiProvider === 'custom') {
-    return await callCustom(prompt);
-  } else {
-    return await callLocalAI(prompt);
-  }
-}
-
-// 调用自定义 OpenAI 兼容 API
-async function callCustom(prompt) {
-  const headers = { 'Content-Type': 'application/json' };
-  if (customApiKey) headers['Authorization'] = `Bearer ${customApiKey}`;
-  const resp = await fetch(customApiUrl, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      model: customApiModel,
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.8,
-      max_tokens: 800,
-    }),
-  });
-  if (!resp.ok) {
-    const err = await resp.json().catch(() => ({}));
-    throw new Error(err.error?.message || `自定义 API 请求失败 (${resp.status})`);
-  }
-  const data = await resp.json();
-  return data.choices?.[0]?.message?.content || '';
+  updateAIStatus();
 }
 
 // 调用阿里百炼 API（每月免费 200 万 tokens，国内直连）
@@ -1651,35 +1412,9 @@ async function callDeepSeek(prompt) {
   return data.choices?.[0]?.message?.content || '';
 }
 
-// 调用本地模型
-async function callLocalAI(prompt) {
-  await ensureLocalModel();
-  const reply = await localEngine.chat.completions.create({
-    messages: [{ role: 'user', content: prompt }],
-    temperature: 0.8,
-    max_tokens: 600,
-  });
-  return reply.choices[0].message.content || '';
-}
-
-// 调用 Gemini API
-async function callGemini(prompt) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`;
-  const body = {
-    contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: { temperature: 0.8, maxOutputTokens: 800 },
-  };
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!resp.ok) {
-    const err = await resp.json().catch(() => ({}));
-    throw new Error(err.error?.message || `请求失败 (${resp.status})`);
-  }
-  const data = await resp.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+// 调用 AI（根据 provider 选择引擎）
+async function callAI(prompt) {
+  return aiProvider === 'dashscope' ? callDashscope(prompt) : callDeepSeek(prompt);
 }
 
 // 构建 AI 提示词
